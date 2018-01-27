@@ -1,4 +1,5 @@
 library(clickstream)
+library(tidyverse)
 
 set.seed(201300810)
 
@@ -34,40 +35,79 @@ class(cls); typeof(cls)
 
 # Interestingly, clickstreams can be generated for practise using a custom 
 # function in the clickstream package
-# We illustrate this with a website that has 20 pages
+# We illustrate this with a website that has 7 pages
+# This example is based on the one given in the package
 
-numWebPages <- 20
-
-# Build the transition matrix for the web pages
-# In real-life, this will be gleaned from data. What proportion of users move
-# between each pair of web pages
-
-tm <- matrix(nrow = numWebPages, ncol = numWebPages)
-
-for (i in 1:numWebPages) {
-  x <- runif(numWebPages)
-  tm[, i] <- x/sum(x)
-}
+numUserSessions <- 1e5
+numWebPages <- 7
+avgPagesBrowsed <- 50 # How many pages (including revisits) does a typical user 
+                      # browse before taking a purchase decision
 
 # Generate a starting probability vector for the pages
 # In real-life this can be obtained from basic probabilities
 # What proportion of users land on home page directly?
 # What proportion of users land on the other pages (probably from search engines)?
 
-sp <- rnorm(n = numWebPages, mean = 0.4, sd = 0.01)
-sp <- sp/sum(sp)
+# The following formulation for the starting probabilities is unrealistic
+# We are using here the probabilities from the package 
 
-randomCls <- randomClickstreams(states = paste0("P", 1:numWebPages),
+# sp <- rnorm(n = numWebPages, mean = 0.4, sd = 0.01)
+# sp <- sp/sum(sp)
+# sp <- c(sp, 0, 0)
+sp <- c(0.2, 0.25, 0.1, 0.15, 0.1, 0.1, 0.1, 0, 0) # The absorbing states have 0 starting probability
+
+# Build the transition matrix for the web pages
+# In real-life, this will be gleaned from data. What proportion of users move
+# between each pair of web pages and how many move to a decision from each
+# web page
+
+tm <- matrix(nrow = numWebPages + 2, ncol = numWebPages + 2) # 2 is added for the absorbing states
+
+for (i in 1:numWebPages) {
+  x <- runif(numWebPages + 2)
+  tm[, i] <- x/sum(x)
+}
+
+tm[, numWebPages + 1] <- rep(0, numWebPages + 2)
+tm[, numWebPages + 2] <- rep(0, numWebPages + 2)
+
+randomCls <- randomClickstreams(states = c(paste0("P", 1:numWebPages), "Defer", "Buy"),
                                 startProbabilities = sp,
                                 transitionMatrix = tm,
-                                meanLength = 10,
-                                n = 100)
+                                meanLength = avgPagesBrowsed,
+                                n = numUserSessions)
 
 summary(randomCls)
-writeClickstreams(randomCls, "example.csv", header = TRUE, sep = ",")
 
-mc <- fitMarkovChain(clickstreamList = randomCls,
-                     order = 2,
-                     control = list(optimizer = "quadratic"))
-summary(mc)
+# writeClickstreams(randomCls, "example.csv", header = TRUE, sep = ",")
+
+# Lets fit multiple markov chains, i.e., of different orders and check which 
+# fits the best
+# This is wasteful since we are using up all the data, but good to see what happens
+# with the underlying mechanics
+
+# The maximal order maxOrder is the minimal length more than 50% of the 
+# clickstreams have. Lets calculate this for this example 
+
+streamLength <- rep(NA, numUserSessions)
+
+# Remember that the clickstream object is a list type
+
+for (session in 1:numUserSessions) {
+  streamLength[session] <- length(randomCls[[session]])
+}
+
+maxOrder <- median(streamLength)
+
+result <- data.frame()
+
+for (k in 1:2) {
+  mc <- fitMarkovChain(clickstreamList = randomCls,
+                       order = k)
+  result <- rbind(result, c(k, summary(mc)$aic, summary(mc)$bic))
+}
+
+
+
+clusters <- clusterClickstreams(randomCls, order = 2, centers = 3)
 
