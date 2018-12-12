@@ -38,10 +38,10 @@ class(cls); typeof(cls)
 # We illustrate this with a website that has 7 pages
 # This example is based on the one given in the package
 
-numUserSessions <- 1e5
-numWebPages <- 7
-avgPagesBrowsed <- 50 # How many pages (including revisits) does a typical user 
-                      # browse before taking a purchase decision
+num_user_sessions <- 1e5
+num_web_pages <- 7
+avg_pages_browsed <- 50 # How many pages (including revisits) does a typical user 
+                        # browse before taking a purchase decision
 
 # Generate a starting probability vector for the pages
 # In real-life this can be obtained from basic probabilities
@@ -51,9 +51,10 @@ avgPagesBrowsed <- 50 # How many pages (including revisits) does a typical user
 # The following formulation for the starting probabilities is unrealistic
 # We are using here the probabilities from the package 
 
-# sp <- rnorm(n = numWebPages, mean = 0.4, sd = 0.01)
+# sp <- rnorm(n = num_web_pages, mean = 0.4, sd = 0.01)
 # sp <- sp/sum(sp)
 # sp <- c(sp, 0, 0)
+
 sp <- c(0.2, 0.25, 0.1, 0.15, 0.1, 0.1, 0.1, 0, 0) # The absorbing states have 0 starting probability
 
 # Build the transition matrix for the web pages
@@ -61,25 +62,26 @@ sp <- c(0.2, 0.25, 0.1, 0.15, 0.1, 0.1, 0.1, 0, 0) # The absorbing states have 0
 # between each pair of web pages and how many move to a decision from each
 # web page
 
-tm <- matrix(nrow = numWebPages + 2, ncol = numWebPages + 2) # 2 is added for the absorbing states
+tm <- matrix(nrow = num_web_pages + 2, 
+             ncol = num_web_pages + 2) # 2 is added for the absorbing states
 
-for (i in 1:numWebPages) {
-  x <- runif(numWebPages + 2)
+for (i in 1:num_web_pages) {
+  x <- runif(num_web_pages + 2)
   tm[, i] <- x/sum(x)
 }
 
-tm[, numWebPages + 1] <- rep(0, numWebPages + 2)
-tm[, numWebPages + 2] <- rep(0, numWebPages + 2)
+tm[, num_web_pages + 1] <- rep(0, num_web_pages + 2)
+tm[, num_web_pages + 2] <- rep(0, num_web_pages + 2)
 
-randomCls <- randomClickstreams(states = c(paste0("P", 1:numWebPages), "Defer", "Buy"),
-                                startProbabilities = sp,
-                                transitionMatrix = tm,
-                                meanLength = avgPagesBrowsed,
-                                n = numUserSessions)
+random_cls <- randomClickstreams(states = c(paste0("P", 1:num_web_pages), "Defer", "Buy"),
+                                 startProbabilities = sp,
+                                 transitionMatrix = tm,
+                                 meanLength = avg_pages_browsed,
+                                 n = num_user_sessions)
 
-summary(randomCls)
+summary(random_cls)
 
-# writeClickstreams(randomCls, "example.csv", header = TRUE, sep = ",")
+# writeClickstreams(random_cls, "example.csv", header = TRUE, sep = ",")
 
 # Lets fit multiple markov chains, i.e., of different orders and check which 
 # fits the best
@@ -89,25 +91,25 @@ summary(randomCls)
 # The maximal order maxOrder is the minimal length more than 50% of the 
 # clickstreams have. Lets calculate this for this example 
 
-streamLength <- rep(NA, numUserSessions)
+stream_length <- rep(NA, num_user_sessions)
 
 # Remember that the clickstream object is a list type
 
-for (session in 1:numUserSessions) {
-  streamLength[session] <- length(randomCls[[session]])
+for (session in 1:num_user_sessions) {
+  stream_length[session] <- length(random_cls[[session]])
 }
 
-maxOrder <- median(streamLength)
+max_order <- median(stream_length)
 
 result <- data.frame()
 
 for (k in 1:2) {
-  mc <- fitMarkovChain(clickstreamList = randomCls,
+  mc <- fitMarkovChain(clickstreamList = random_cls,
                        order = k)
   result <- rbind(result, c(k, summary(mc)$aic, summary(mc)$bic))
 }
 
 
 
-clusters <- clusterClickstreams(randomCls, order = 2, centers = 3)
+clusters <- clusterClickstreams(random_cls, order = 2, centers = 3)
 
